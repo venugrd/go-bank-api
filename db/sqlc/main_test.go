@@ -3,17 +3,18 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-var container testcontainers.Container
+var container *postgres.PostgresContainer
 var ctx context.Context
 
 const (
@@ -25,62 +26,50 @@ var testQueries *Queries
 
 func createTestContainer(ctx context.Context) (connString string, err error) {
 	wd, err := os.Getwd()
-	sqlScripts := wd + "/testdata/schema.sql"
-
 	if err != nil {
-		log.Fatal("Couldn't get current working deirectory", err)
-		return "", err
+		panic(err)
 	}
-
-	req := testcontainers.ContainerRequest{
-		Image:        "postgres:17-alpine",
-		ExposedPorts: []string{"5432/tcp"},
-		Env: map[string]string{
-			"POSTGRES_USER":     "postgres",
-			"POSTGRES_PASSWORD": "postgres",
-			"POSTGRES_DB":       "simple_bank",
-		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
-	}
-
-	container, err = testcontainers.GenericContainer(ctx,
-		testcontainers.GenericContainerRequest{
-			ContainerRequest: req,
-			Started:          true,
-		},
+	testScript := wd + "/testdata/schema.sql"
+	container, err = postgres.Run(ctx, "postgres:17-alpine",
+		postgres.WithInitScripts(testScript),
+		postgres.WithDatabase("simple_bank"),
+		postgres.WithUsername("postgres"),
+		postgres.WithPassword("postgres"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).WithStartupTimeout(5*time.Second)),
 	)
 
 	if err != nil {
-		log.Fatal("cannot create test container:", err)
-		return "", fmt.Errorf("run container: %w", err)
+		panic(err)
 	}
 
-	port, err := container.MappedPort(ctx, "5432")
-
+	connString, err = container.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-
-	connString = fmt.Sprintf("postgres://postgres:postgres@127.0.0.1:%d/simple_bank?sslmode=disable", port.Int())
 
 	return connString, nil
 }
 
 func TestMain(m *testing.M) {
 	ctx = context.Background()
-	connString, err := createTestContainer(ctx)
 
+	connString, err := createTestContainer(ctx)
 	if err != nil {
 		log.Fatal("cannot create test container:", err)
 	}
 
 	conn, err := sql.Open("postgres", connString)
-
 	if err != nil {
 		log.Fatal("cannot connect to db:", err)
 	}
 
 	testQueries = New(conn)
 
-	os.Exit(m.Run())
+	code := m.Run()
+
+	container.Terminate(ctx)
+
+	os.Exit(code)
 }
