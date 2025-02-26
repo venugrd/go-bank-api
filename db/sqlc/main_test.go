@@ -23,6 +23,7 @@ const (
 )
 
 var testQueries *Queries
+var testDB *sql.DB
 
 func createTestContainer(ctx context.Context) (connString string, err error) {
 	wd, err := os.Getwd()
@@ -60,12 +61,12 @@ func TestMain(m *testing.M) {
 		log.Fatal("cannot create test container:", err)
 	}
 
-	conn, err := sql.Open("postgres", connString)
+	testDB, err = sql.Open("postgres", connString)
 	if err != nil {
 		log.Fatal("cannot connect to db:", err)
 	}
 
-	testQueries = New(conn)
+	testQueries = New(testDB)
 
 	code := m.Run()
 
