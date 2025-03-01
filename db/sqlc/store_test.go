@@ -8,6 +8,58 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_TransferTx_ForDeadLock(t *testing.T) {
+	store := NewStore(testDB)
+
+	account1 := createRandomAccount(t)
+	account2 := createRandomAccount(t)
+
+	//run n transfers
+	n := 100
+	amount := int64(10)
+
+	errs := make(chan error)
+
+	for i := range n {
+
+		var fromAccount int64
+		var toAccount int64
+
+		if i%2 == 0 {
+			fromAccount = account1.ID
+			toAccount = account2.ID
+		} else {
+			fromAccount = account2.ID
+			toAccount = account1.ID
+		}
+		ctx := context.Background()
+		go func() {
+			_, err := store.TransferTx(ctx, TransferTxParams{
+				FromAccountId: fromAccount,
+				ToAccountId:   toAccount,
+				Amount:        amount,
+			})
+			errs <- err
+		}()
+	}
+
+	//check results
+	for range n {
+		err := <-errs
+		require.NoError(t, err)
+	}
+
+	updatedAccount1, err := testQueries.GetAccount(context.Background(), account1.ID)
+	require.NoError(t, err)
+
+	updatedAccount2, err := testQueries.GetAccount(context.Background(), account2.ID)
+	require.NoError(t, err)
+
+	require.Equal(t, account1.Balance, updatedAccount1.Balance)
+	require.Equal(t, account2.Balance, updatedAccount2.Balance)
+
+}
+
 func TestTransferTx(t *testing.T) {
 	store := NewStore(testDB)
 
@@ -16,7 +68,7 @@ func TestTransferTx(t *testing.T) {
 	log.Println(">> before:", account1.Balance, account2.Balance)
 
 	//run n transfers
-	n := 5
+	n := 20
 	amount := int64(10)
 
 	//	req := TransferTxParams{
@@ -28,9 +80,10 @@ func TestTransferTx(t *testing.T) {
 	errs := make(chan error)
 	results := make(chan TransferTxResult)
 
-	for range n {
+	for i := 0; i < n; i++ {
+		ctx := context.Background()
 		go func() {
-			result, err := store.TransferTx(context.Background(), TransferTxParams{
+			result, err := store.TransferTx(ctx, TransferTxParams{
 				FromAccountId: account1.ID,
 				ToAccountId:   account2.ID,
 				Amount:        amount,
@@ -44,7 +97,7 @@ func TestTransferTx(t *testing.T) {
 	existed := make(map[int]bool)
 	for range n {
 		err := <-errs
-		require.NoError(t, err, "You shouldn't be receiving error here!")
+		require.NoError(t, err)
 
 		result := <-results
 		require.NotEmpty(t, result)
@@ -88,12 +141,11 @@ func TestTransferTx(t *testing.T) {
 		require.NotEmpty(t, fromAccount)
 		require.Equal(t, account1.ID, fromAccount.ID)
 
-		toAccount := result.FromAccount
+		toAccount := result.ToAccount
 		require.NotEmpty(t, toAccount)
 		require.Equal(t, account2.ID, toAccount.ID)
 
 		//check accounts balance
-		log.Println(">> tx:", fromAccount.Balance, toAccount.Balance)
 		diff1 := account1.Balance - fromAccount.Balance
 		diff2 := toAccount.Balance - account2.Balance
 		require.Equal(t, diff1, diff2)

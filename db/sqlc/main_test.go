@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -53,15 +55,30 @@ func createTestContainer(ctx context.Context) (connString string, err error) {
 	return connString, nil
 }
 
+func getConnectionString(containerType string, ctx context.Context) (string, error) {
+	switch containerType {
+	case "local":
+		return dbSource, nil
+	case "test":
+		return createTestContainer(ctx)
+	default:
+		return "", errors.New("Coudn't get the connection right now!")
+	}
+}
+
 func TestMain(m *testing.M) {
 	ctx = context.Background()
 
-	connString, err := createTestContainer(ctx)
+	containerType := "test"
+
+	connString, err := getConnectionString(containerType, ctx)
+	fmt.Println("connection string", connString)
 	if err != nil {
 		log.Fatal("cannot create test container:", err)
 	}
 
 	testDB, err = sql.Open("postgres", connString)
+	testDB.SetMaxOpenConns(10)
 	if err != nil {
 		log.Fatal("cannot connect to db:", err)
 	}
@@ -70,7 +87,9 @@ func TestMain(m *testing.M) {
 
 	code := m.Run()
 
-	container.Terminate(ctx)
+	if containerType == "test" {
+		container.Terminate(ctx)
+	}
 
 	os.Exit(code)
 }
