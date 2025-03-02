@@ -8,3 +8,4 @@ sql:
         package: "db"
         out: "db/sqlc"
         sql_package: "database/sql"
+        emit_interface: true
