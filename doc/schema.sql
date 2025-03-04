@@ -7,8 +7,8 @@ CREATE TABLE "simple_bank"."users" (
   "email" varchar UNIQUE NOT NULL,
   "is_email_verified" bool NOT NULL DEFAULT false,
   "hashed_password" varchar NOT NULL,
-  "password_changed_at" timestampz NOT NULL DEFAULT '0001-01-01',
-  "created_at" timestampz NOT NULL DEFAULT (now())
+  "password_changed_at" timestamptz NOT NULL DEFAULT '0001-01-01',
+  "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
 CREATE TABLE "verify_emails" (
@@ -17,8 +17,8 @@ CREATE TABLE "verify_emails" (
   "email" varchar NOT NULL,
   "secret_code" varchar NOT NULL,
   "is_used" bool NOT NULL DEFAULT false,
-  "created_at" timestampz NOT NULL DEFAULT (now()),
-  "expired_at" timestampz NOT NULL DEFAULT (now() + interval '15 minutes')
+  "created_at" timestamptz NOT NULL DEFAULT (now()),
+  "expired_at" timestamptz NOT NULL DEFAULT (now() + interval '15 minutes')
 );
 
 CREATE TABLE "accounts" (
@@ -26,14 +26,14 @@ CREATE TABLE "accounts" (
   "owner" varchar NOT NULL,
   "balance" bigint NOT NULL,
   "currency" varchar NOT NULL,
-  "created_at" timestampz NOT NULL DEFAULT (now())
+  "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
 CREATE TABLE "entries" (
   "id" bigserial PRIMARY KEY,
   "account_id" bigint NOT NULL,
   "amount" bigint NOT NULL,
-  "created_at" timestampz NOT NULL DEFAULT (now())
+  "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
 CREATE TABLE "transfers" (
@@ -41,7 +41,7 @@ CREATE TABLE "transfers" (
   "from_account_id" bigint NOT NULL,
   "to_account_id" bigint NOT NULL,
   "amount" bigint NOT NULL,
-  "created_at" timestampz NOT NULL DEFAULT (now())
+  "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
 CREATE TABLE "sessions" (
@@ -51,8 +51,8 @@ CREATE TABLE "sessions" (
   "user_agent" varchar NOT NULL,
   "client_ip" varchar NOT NULL,
   "is_blocked" bool NOT NULL DEFAULT false,
-  "expired_at" timestampz NOT NULL,
-  "created_at" timestampz NOT NULL DEFAULT (now())
+  "expired_at" timestamptz NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 
 CREATE INDEX ON "accounts" ("owner");
