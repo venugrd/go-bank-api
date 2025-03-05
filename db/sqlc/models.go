@@ -32,3 +32,12 @@ type Transfer struct {
 	Amount    int64
 	CreatedAt time.Time
 }
+
+type User struct {
+	Username          string
+	FullName          string
+	Email             string
+	HashedPassword    string
+	PasswordChangedAt time.Time
+	CreatedAt         time.Time
+}
