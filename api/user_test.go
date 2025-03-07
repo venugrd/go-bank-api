@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -18,7 +20,7 @@ import (
 )
 
 func TestCreateUserAPI(t *testing.T) {
-	user := randomUser()
+	user, pass := createRandomUser(t)
 
 	testCases := []struct {
 		name          string
@@ -32,16 +34,17 @@ func TestCreateUserAPI(t *testing.T) {
 				Username: user.Username,
 				FullName: user.FullName,
 				Email:    user.Email,
-				Password: user.HashedPassword,
+				Password: pass,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateUserParams{
+					Username:       user.Username,
+					FullName:       user.FullName,
+					Email:          user.Email,
+					HashedPassword: user.HashedPassword,
+				}
 				store.EXPECT().
-					CreateUser(gomock.Any(), gomock.Eq(db.CreateUserParams{
-						Username:       user.Username,
-						FullName:       user.FullName,
-						Email:          user.Email,
-						HashedPassword: user.HashedPassword,
-					})).
+					CreateUser(gomock.Any(), EqcreateUserParams(arg, pass)).
 					Times(1).
 					Return(user, nil)
 			},
@@ -90,16 +93,17 @@ func TestCreateUserAPI(t *testing.T) {
 				Username: user.Username,
 				FullName: user.FullName,
 				Email:    user.Email,
-				Password: user.HashedPassword,
+				Password: pass,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateUserParams{
+					Username:       user.Username,
+					FullName:       user.FullName,
+					Email:          user.Email,
+					HashedPassword: user.HashedPassword,
+				}
 				store.EXPECT().
-					CreateUser(gomock.Any(), gomock.Eq(db.CreateUserParams{
-						Username:       user.Username,
-						FullName:       user.FullName,
-						Email:          user.Email,
-						HashedPassword: user.HashedPassword,
-					})).
+					CreateUser(gomock.Any(), EqcreateUserParams(arg, pass)).
 					Times(1).
 					Return(db.User{}, sql.ErrConnDone)
 			},
@@ -139,15 +143,18 @@ func TestCreateUserAPI(t *testing.T) {
 	}
 }
 
-func randomUser() db.User {
-	user := db.User{
-		Username:       util.RandomUsername(),
+func createRandomUser(t *testing.T) (user db.User, password string) {
+	password = util.RandomString(10)
+	hashedPassword, err := util.HashPassword(password)
+	require.NoError(t, err)
+
+	user = db.User{
+		Username:       util.RandomOwner(),
+		HashedPassword: hashedPassword,
 		FullName:       util.RandomOwner(),
 		Email:          util.RandomEmail(),
-		HashedPassword: util.RandomString(10),
 	}
-	log.Println("Created Randome User:", user)
-	return user
+	return
 }
 
 func requireBodyMatchUser(t *testing.T, body *bytes.Buffer, user db.User) {
@@ -162,4 +169,32 @@ func requireBodyMatchUser(t *testing.T, body *bytes.Buffer, user db.User) {
 	require.Equal(t, gotUser.Username, user.Username)
 	require.Equal(t, gotUser.Email, user.Email)
 	require.Equal(t, gotUser.FullName, user.FullName)
+}
+
+type eqCreateUserParamsMatcher struct {
+	arg      db.CreateUserParams
+	password string
+}
+
+func (e eqCreateUserParamsMatcher) Matches(x interface{}) bool {
+	arg, ok := x.(db.CreateUserParams)
+	if !ok {
+		return false
+	}
+
+	err := util.IsValidPassword(arg.HashedPassword, e.password)
+	if err != nil {
+		return false
+	}
+
+	e.arg.HashedPassword = arg.HashedPassword
+	return reflect.DeepEqual(e.arg, arg)
+}
+
+func (e eqCreateUserParamsMatcher) String() string {
+	return fmt.Sprintf("matches arg %v and password %v", e.arg, e.password)
+}
+
+func EqcreateUserParams(arg db.CreateUserParams, password string) gomock.Matcher {
+	return eqCreateUserParamsMatcher{arg, password}
 }
