@@ -13,7 +13,7 @@ type createUserRequest struct {
 	Username string `json:"username" binding:"required,alphanum,min=4"`
 	FullName string `json:"full_name" binding:"required,alpha,min=4"`
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding="required,min=6"`
+	Password string `json:"password" binding:"required,min=6"`
 }
 
 type userResponse struct {
@@ -62,27 +62,3 @@ func (server *Server) createUser(ctx *gin.Context) {
 	rsp := newUserResponse(user)
 	ctx.JSON(http.StatusOK, rsp)
 }
-
-// type getUserRquest struct {
-// 	username int64 `uri:"username" binding:"required,min=4"`
-// }
-
-// func (server *Server) getUser(ctx *gin.Context) {
-// 	var req getUserRquest
-// 	if err := ctx.ShouldBindUri(&req); err != nil {
-// 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-// 		return
-// 	}
-
-// 	account, err := server.store.GetAccount(ctx, req.ID)
-// 	if err != nil {
-// 		if err == sql.ErrNoRows {
-// 			ctx.JSON(http.StatusNotFound, errorResponse(err))
-// 			return
-// 		}
-// 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-// 		return
-// 	}
-
-// 	ctx.JSON(http.StatusOK, account)
-// }
